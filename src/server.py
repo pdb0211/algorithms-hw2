@@ -77,6 +77,7 @@ def _render_hash_trace(steps: tuple[tuple[str, int], ...], capacity: int) -> str
 
 def _render_table(shortener: URLShortener) -> str:
     capacity, load_factor, buckets = shortener.table_snapshot()
+    uses_linear_probing = shortener.strategy == "linear"
     rows = []
     for bucket_index, bucket in enumerate(buckets):
         if not bucket:
@@ -93,18 +94,24 @@ def _render_table(shortener: URLShortener) -> str:
                     '<section class="chain-node">'
                     f"<div><strong>URL 키:</strong> {escaped_url}</div>"
                     f"<div><strong>짧은 코드:</strong> {escaped_code}</div>"
+                    f"<div><strong>저장된 칸:</strong> {bucket_index}</div>"
                     f'<div><strong>짧은 링크:</strong> '
                     f'<a href="{escaped_path}">{escaped_path}</a></div>'
                     f"{trace}</section>"
                 )
-            chain = " &rarr; ".join(nodes) + " &rarr; None"
+            if uses_linear_probing:
+                chain = nodes[0]
+            else:
+                chain = " &rarr; ".join(nodes) + " &rarr; None"
         rows.append(f"<tr><th>{bucket_index}</th><td>{chain}</td></tr>")
 
+    strategy_label = "선형 탐지 배열" if uses_linear_probing else "개별 체이닝"
     content = (
         "<h1>현재 해시 테이블</h1>"
+        f"<p>충돌 처리 방식: {strategy_label}</p>"
         f"<p>칸 수: {capacity} · 항목 수 적재율: {load_factor:.4f}</p>"
         '<p><a href="/">URL 단축기로 돌아가기</a></p>'
-        "<table><thead><tr><th>칸</th><th>개별 체이닝 연결 리스트</th></tr></thead>"
+        f"<table><thead><tr><th>칸</th><th>{strategy_label}</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
     )
     return _document("해시 테이블", content)
@@ -116,7 +123,7 @@ def create_server(
     shortener: URLShortener | None = None,
 ) -> HTTPServer:
     """Create an HTTP server, optionally using an existing shortener instance."""
-    app = shortener if shortener is not None else URLShortener()
+    app = shortener if shortener is not None else URLShortener(strategy="linear")
 
     class ShortenerHandler(BaseHTTPRequestHandler):
         def _send_html(self, status: int, document: str) -> None:
