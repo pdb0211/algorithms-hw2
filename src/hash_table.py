@@ -1,6 +1,10 @@
 """A string-keyed hash table using separate chaining and Horner hashing."""
 
 import math
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.linear_probing_hash_table import LinearProbingHashTable
 
 
 class _Node:
@@ -146,3 +150,11 @@ class HashTable:
                     node.key, node.value, self._buckets[index]
                 )
                 node = node.next
+
+
+def __getattr__(name: str):
+    if name == "LinearProbingHashTable":
+        from src.linear_probing_hash_table import LinearProbingHashTable
+
+        return LinearProbingHashTable
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
