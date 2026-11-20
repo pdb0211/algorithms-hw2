@@ -2,29 +2,35 @@ import unittest
 
 from src.shortener import URLShortener
 
+TABLE_STRATEGIES = ("chaining", "linear")
+
 
 class URLShortenerTests(unittest.TestCase):
     def test_first_code_is_zero_and_url_round_trips(self):
-        shortener = URLShortener()
         url = "https://example.com/path?query=value"
 
-        code = shortener.shorten(url)
+        for strategy in TABLE_STRATEGIES:
+            with self.subTest(strategy=strategy):
+                shortener = URLShortener(strategy=strategy)
 
-        self.assertEqual(code, "0")
-        self.assertEqual(shortener.expand(code), url)
+                code = shortener.shorten(url)
+
+                self.assertEqual(code, "0")
+                self.assertEqual(shortener.expand(code), url)
 
     def test_repeated_url_reuses_code_and_different_urls_get_different_codes(self):
-        shortener = URLShortener()
         first_url = "https://example.com/first"
         second_url = "https://example.com/second"
 
-        first_code = shortener.shorten(first_url)
+        for strategy in TABLE_STRATEGIES:
+            with self.subTest(strategy=strategy):
+                shortener = URLShortener(strategy=strategy)
+                first_code = shortener.shorten(first_url)
 
-        self.assertEqual(shortener.shorten(first_url), first_code)
-        self.assertNotEqual(shortener.shorten(second_url), first_code)
+                self.assertEqual(shortener.shorten(first_url), first_code)
+                self.assertNotEqual(shortener.shorten(second_url), first_code)
 
     def test_rejects_invalid_urls(self):
-        shortener = URLShortener()
         invalid_urls = (
             "",
             " https://example.com",
@@ -33,16 +39,24 @@ class URLShortenerTests(unittest.TestCase):
             "https://",
         )
 
-        for url in invalid_urls:
-            with self.subTest(url=url):
-                with self.assertRaises(ValueError):
-                    shortener.shorten(url)
+        for strategy in TABLE_STRATEGIES:
+            shortener = URLShortener(strategy=strategy)
+            for url in invalid_urls:
+                with self.subTest(strategy=strategy, url=url):
+                    with self.assertRaises(ValueError):
+                        shortener.shorten(url)
 
     def test_unknown_code_raises_key_error(self):
-        shortener = URLShortener()
+        for strategy in TABLE_STRATEGIES:
+            with self.subTest(strategy=strategy):
+                shortener = URLShortener(strategy=strategy)
 
-        with self.assertRaises(KeyError):
-            shortener.expand("Z")
+                with self.assertRaises(KeyError):
+                    shortener.expand("Z")
+
+    def test_rejects_unknown_table_strategy(self):
+        with self.assertRaises(ValueError):
+            URLShortener(strategy="unknown")
 
 
 if __name__ == "__main__":
