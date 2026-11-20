@@ -4,14 +4,23 @@ from urllib.parse import urlsplit
 
 from src.base62 import encode
 from src.hash_table import HashTable
+from src.linear_probing_hash_table import LinearProbingHashTable
 
 
 class URLShortener:
     """Create stable base62 codes for valid HTTP(S) URLs."""
 
-    def __init__(self):
-        self._url_to_code = HashTable()
-        self._code_to_url = HashTable()
+    def __init__(self, strategy: str = "chaining"):
+        if strategy == "chaining":
+            table_type = HashTable
+        elif strategy == "linear":
+            table_type = LinearProbingHashTable
+        else:
+            raise ValueError("strategy must be 'chaining' or 'linear'")
+
+        self.strategy = strategy
+        self._url_to_code = table_type()
+        self._code_to_url = table_type()
         self._next_id = 0
 
     @staticmethod
