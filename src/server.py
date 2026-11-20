@@ -79,9 +79,10 @@ def _render_hash_trace(steps: tuple[tuple[str, int], ...], capacity: int) -> str
     )
 
 
-def _render_table(shortener: URLShortener) -> str:
-    capacity, load_factor, buckets = shortener.table_snapshot()
-    uses_linear_probing = shortener.strategy == "linear"
+def _render_table(shortener: URLShortener, strategy: str | None = None) -> str:
+    table_strategy = shortener.strategy if strategy is None else strategy
+    capacity, load_factor, buckets = shortener.table_snapshot(table_strategy)
+    uses_linear_probing = table_strategy == "linear"
     rows = []
     for bucket_index, bucket in enumerate(buckets):
         if not bucket:
@@ -114,6 +115,8 @@ def _render_table(shortener: URLShortener) -> str:
         "<h1>현재 해시 테이블</h1>"
         f"<p>충돌 처리 방식: {strategy_label}</p>"
         f"<p>칸 수: {capacity} · 항목 수 적재율: {load_factor:.4f}</p>"
+        '<p>표시 방식: <a href="/table?strategy=chaining">개별 체이닝</a> · '
+        '<a href="/table?strategy=linear">선형 탐지</a></p>'
         '<p><a href="/">URL 단축기로 돌아가기</a></p>'
         f"<table><thead><tr><th>칸</th><th>{strategy_label}</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
@@ -146,7 +149,37 @@ def create_server(
                 self._send_html(200, _render_form(strategy=app.strategy))
                 return
             if path == "/table":
-                self._send_html(200, _render_table(app))
+                try:
+                    query_fields = parse_qsl(
+                        urlsplit(self.path).query,
+                        keep_blank_values=True,
+                        max_num_fields=10,
+                    )
+                except ValueError:
+                    self._send_html(
+                        400,
+                        _document(
+                            "잘못된 쿼리",
+                            "<h1>쿼리 매개변수가 너무 많습니다.</h1>",
+                        ),
+                    )
+                    return
+
+                strategy = app.strategy
+                for name, value in query_fields:
+                    if name == "strategy":
+                        strategy = value
+                        break
+                if strategy not in ("chaining", "linear"):
+                    self._send_html(
+                        400,
+                        _document(
+                            "잘못된 충돌 처리 방식",
+                            "<h1>지원하지 않는 충돌 처리 방식입니다.</h1>",
+                        ),
+                    )
+                    return
+                self._send_html(200, _render_table(app, strategy))
                 return
             if path.startswith("/") and path.count("/") == 1:
                 code = unquote(path[1:])

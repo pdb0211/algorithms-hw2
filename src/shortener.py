@@ -62,12 +62,33 @@ class URLShortener:
 
     def table_snapshot(
         self,
+        strategy: str | None = None,
     ) -> tuple[int, float, tuple[tuple[tuple[str, str], ...], ...]]:
-        """Return the URL-to-code table's capacity, load factor, and buckets."""
+        """Return a table snapshot using the requested collision strategy."""
+        requested_strategy = self.strategy if strategy is None else strategy
+        if requested_strategy == self.strategy:
+            table = self._url_to_code
+        elif requested_strategy == "chaining":
+            table = HashTable(
+                capacity=self._url_to_code.capacity,
+                max_load=self._url_to_code.max_load,
+            )
+        elif requested_strategy == "linear":
+            table = LinearProbingHashTable(
+                capacity=self._url_to_code.capacity,
+                max_load=self._url_to_code.max_load,
+            )
+        else:
+            raise ValueError("strategy must be 'chaining' or 'linear'")
+
+        if requested_strategy != self.strategy:
+            for url, code in self._url_to_code.items():
+                table.put(url, code)
+
         return (
-            self._url_to_code.capacity,
-            self._url_to_code.load_factor,
-            self._url_to_code.slots(),
+            table.capacity,
+            table.load_factor,
+            table.slots(),
         )
 
     def hash_steps(self, url: str) -> tuple[tuple[str, int], ...]:

@@ -73,6 +73,33 @@ class ServerTests(unittest.TestCase):
         self.assertIn("Horner 해시 계산 과정", body)
         self.assertNotIn("&rarr; None", body)
 
+    def test_table_page_can_show_chaining_for_linear_service_data(self):
+        payload = urlencode({"url": "https://example.com/path"}).encode("utf-8")
+        self._request(
+            "POST",
+            "/",
+            payload,
+            {"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+        status, _, body = self._request("GET", "/table?strategy=chaining")
+
+        self.assertEqual(status, 200)
+        self.assertIn("개별 체이닝", body)
+        self.assertIn("&rarr; None", body)
+        self.assertIn('href="/table?strategy=linear"', body)
+
+    def test_table_page_rejects_unknown_strategy(self):
+        status, _, _ = self._request("GET", "/table?strategy=unknown")
+
+        self.assertEqual(status, 400)
+
+    def test_table_page_rejects_too_many_query_parameters(self):
+        parameters = "&".join(f"unused={index}" for index in range(11))
+        status, _, _ = self._request("GET", f"/table?{parameters}")
+
+        self.assertEqual(status, 400)
+
     def test_chaining_strategy_can_be_selected(self):
         server = create_server("127.0.0.1", 0, strategy="chaining")
         thread = threading.Thread(target=server.serve_forever)
@@ -99,6 +126,12 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertIn("개별 체이닝", table)
             self.assertIn("&rarr; None", table)
+
+            connection.request("GET", "/table?strategy=linear")
+            response = connection.getresponse()
+            linear_table = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("선형 탐지 배열", linear_table)
 
             connection.request("GET", "/")
             response = connection.getresponse()
