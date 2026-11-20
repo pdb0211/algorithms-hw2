@@ -44,6 +44,27 @@ class HashTableTests(unittest.TestCase):
 
         self.assertCountEqual(table.items(), expected)
 
+    def test_none_max_load_disables_resize(self):
+        table = HashTable(capacity=3, max_load=None)
+
+        for index in range(10):
+            table.put(f"key-{index}", f"value-{index}")
+
+        self.assertEqual(table.capacity, 3)
+        self.assertEqual(table.load_factor, 10 / 3)
+
+    def test_get_records_nodes_compared(self):
+        table = HashTable()
+        table.put("a", "first")
+        table.put("l", "second")
+
+        self.assertEqual(table.get("l"), "second")
+        self.assertEqual(table.last_probes, 1)
+        self.assertEqual(table.get("a"), "first")
+        self.assertEqual(table.last_probes, 2)
+        self.assertIsNone(table.get("w"))
+        self.assertEqual(table.last_probes, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

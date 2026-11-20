@@ -1,5 +1,7 @@
 """A string-keyed hash table using separate chaining and Horner hashing."""
 
+import math
+
 
 class _Node:
     __slots__ = ("key", "value", "next")
@@ -13,18 +15,27 @@ class _Node:
 class HashTable:
     """Store string keys and values in buckets with linked-list collision chains."""
 
-    _MAX_LOAD_FACTOR = 0.75
     _HORNER_MULTIPLIER = 257
 
-    def __init__(self, capacity: int = 11):
+    def __init__(self, capacity: int = 11, max_load: float | None = 0.75):
         if not isinstance(capacity, int) or isinstance(capacity, bool):
             raise TypeError("capacity must be an integer")
         if capacity <= 0:
             raise ValueError("capacity must be positive")
+        if max_load is not None:
+            if (
+                isinstance(max_load, bool)
+                or not isinstance(max_load, (int, float))
+            ):
+                raise TypeError("max_load must be a positive number or None")
+            if not math.isfinite(max_load) or max_load <= 0:
+                raise ValueError("max_load must be a positive finite number")
 
         self.capacity = capacity
+        self.max_load = max_load
         self._buckets: list[_Node | None] = [None] * capacity
         self._size = 0
+        self.last_probes = 0
 
     @property
     def load_factor(self) -> float:
@@ -41,8 +52,11 @@ class HashTable:
         return tuple(steps)
 
     def _index(self, key: str) -> int:
-        steps = self.hash_steps(key)
-        return steps[-1][1] if steps else 0
+        self._validate_key(key)
+        value = 0
+        for character in key:
+            value = (value * self._HORNER_MULTIPLIER + ord(character)) % self.capacity
+        return value
 
     @staticmethod
     def _validate_key(key: str) -> None:
@@ -68,14 +82,16 @@ class HashTable:
 
         self._buckets[index] = _Node(key, value, self._buckets[index])
         self._size += 1
-        if self.load_factor > self._MAX_LOAD_FACTOR:
+        if self.max_load is not None and self.load_factor > self.max_load:
             self._resize(self.capacity * 2 + 1)
 
     def get(self, key: str) -> str | None:
         """Return the value for key, or None when key is absent."""
+        self.last_probes = 0
         index = self._index(key)
         node = self._buckets[index]
         while node is not None:
+            self.last_probes += 1
             if node.key == key:
                 return node.value
             node = node.next
