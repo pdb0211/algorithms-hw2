@@ -15,7 +15,7 @@ class _Node:
 class HashTable:
     """Store string keys and values in buckets with linked-list collision chains."""
 
-    _HORNER_MULTIPLIER = 257
+    HORNER_MULTIPLIER = 257
 
     def __init__(self, capacity: int = 11, max_load: float | None = 0.75):
         if not isinstance(capacity, int) or isinstance(capacity, bool):
@@ -47,7 +47,7 @@ class HashTable:
         value = 0
         steps = []
         for character in key:
-            value = (value * self._HORNER_MULTIPLIER + ord(character)) % self.capacity
+            value = (value * self.HORNER_MULTIPLIER + ord(character)) % self.capacity
             steps.append((character, value))
         return tuple(steps)
 
@@ -55,7 +55,7 @@ class HashTable:
         self._validate_key(key)
         value = 0
         for character in key:
-            value = (value * self._HORNER_MULTIPLIER + ord(character)) % self.capacity
+            value = (value * self.HORNER_MULTIPLIER + ord(character)) % self.capacity
         return value
 
     @staticmethod

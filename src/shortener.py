@@ -50,3 +50,17 @@ class URLShortener:
         if url is None:
             raise KeyError(code)
         return url
+
+    def table_snapshot(
+        self,
+    ) -> tuple[int, float, tuple[tuple[tuple[str, str], ...], ...]]:
+        """Return the URL-to-code table's capacity, load factor, and buckets."""
+        return (
+            self._url_to_code.capacity,
+            self._url_to_code.load_factor,
+            self._url_to_code.slots(),
+        )
+
+    def hash_steps(self, url: str) -> tuple[tuple[str, int], ...]:
+        """Return the table's Horner hash steps for a URL key."""
+        return self._url_to_code.hash_steps(url)
