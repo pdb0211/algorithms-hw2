@@ -33,6 +33,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn('name="url"', body)
         self.assertIn('type="url"', body)
+        self.assertIn("충돌 처리 방식: 선형 탐지", body)
 
     def test_post_shows_short_link_and_get_redirects(self):
         url = "https://example.com/path"
@@ -71,6 +72,44 @@ class ServerTests(unittest.TestCase):
         self.assertIn("<details>", body)
         self.assertIn("Horner 해시 계산 과정", body)
         self.assertNotIn("&rarr; None", body)
+
+    def test_chaining_strategy_can_be_selected(self):
+        server = create_server("127.0.0.1", 0, strategy="chaining")
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", server.server_port, timeout=5
+        )
+        try:
+            payload = urlencode({"url": "https://example.com/chaining"}).encode()
+            connection.request(
+                "POST",
+                "/",
+                body=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response = connection.getresponse()
+            result = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn('href="/0"', result)
+
+            connection.request("GET", "/table")
+            response = connection.getresponse()
+            table = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("개별 체이닝", table)
+            self.assertIn("&rarr; None", table)
+
+            connection.request("GET", "/")
+            response = connection.getresponse()
+            home = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("충돌 처리 방식: 개별 체이닝", home)
+        finally:
+            connection.close()
+            server.shutdown()
+            thread.join()
+            server.server_close()
 
     def test_invalid_input_and_unknown_code_return_errors(self):
         payload = urlencode({"url": "not-a-url"}).encode("utf-8")

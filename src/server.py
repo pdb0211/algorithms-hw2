@@ -30,11 +30,15 @@ def _document(title: str, content: str) -> str:
     )
 
 
-def _render_form(message: str = "", url_value: str = "") -> str:
+def _render_form(
+    message: str = "", url_value: str = "", strategy: str = "linear"
+) -> str:
     notice = f'<p role="alert">{html.escape(message)}</p>' if message else ""
     escaped_url = html.escape(url_value, quote=True)
+    strategy_label = "선형 탐지" if strategy == "linear" else "개별 체이닝"
     content = (
         "<h1>URL 단축기</h1>"
+        f"<p>충돌 처리 방식: {strategy_label}</p>"
         f"{notice}"
         '<form method="post" action="/">'
         '<label for="url">줄일 URL</label><br>'
@@ -121,9 +125,10 @@ def create_server(
     host: str = "0.0.0.0",
     port: int = 8000,
     shortener: URLShortener | None = None,
+    strategy: str = "linear",
 ) -> HTTPServer:
-    """Create an HTTP server, optionally using an existing shortener instance."""
-    app = shortener if shortener is not None else URLShortener(strategy="linear")
+    """Create an HTTP server using the selected strategy or supplied shortener."""
+    app = shortener if shortener is not None else URLShortener(strategy=strategy)
 
     class ShortenerHandler(BaseHTTPRequestHandler):
         def _send_html(self, status: int, document: str) -> None:
@@ -138,7 +143,7 @@ def create_server(
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
             if path == "/":
-                self._send_html(200, _render_form())
+                self._send_html(200, _render_form(strategy=app.strategy))
                 return
             if path == "/table":
                 self._send_html(200, _render_table(app))
@@ -174,10 +179,17 @@ def create_server(
             except ValueError:
                 body_length = -1
             if body_length < 0:
-                self._send_html(400, _render_form("요청 본문 길이가 올바르지 않습니다."))
+                self._send_html(
+                    400,
+                    _render_form(
+                        "요청 본문 길이가 올바르지 않습니다.", strategy=app.strategy
+                    ),
+                )
                 return
             if body_length > MAX_REQUEST_BYTES:
-                self._send_html(413, _render_form("요청이 너무 큽니다."))
+                self._send_html(
+                    413, _render_form("요청이 너무 큽니다.", strategy=app.strategy)
+                )
                 return
 
             try:
@@ -187,7 +199,10 @@ def create_server(
                     max_num_fields=10,
                 )
             except (UnicodeDecodeError, ValueError):
-                self._send_html(400, _render_form("요청 내용을 읽을 수 없습니다."))
+                self._send_html(
+                    400,
+                    _render_form("요청 내용을 읽을 수 없습니다.", strategy=app.strategy),
+                )
                 return
 
             url = ""
@@ -198,7 +213,9 @@ def create_server(
             try:
                 code = app.shorten(url)
             except ValueError as error:
-                self._send_html(400, _render_form(str(error), url))
+                self._send_html(
+                    400, _render_form(str(error), url, strategy=app.strategy)
+                )
                 return
             self._send_html(200, _render_result(code))
 
@@ -208,9 +225,15 @@ def create_server(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the URL shortener HTTP service.")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--strategy", choices=("chaining", "linear"), default="linear"
+    )
     arguments = parser.parse_args()
-    server = create_server(port=arguments.port)
-    print(f"Serving URL shortener on port {arguments.port}")
+    server = create_server(port=arguments.port, strategy=arguments.strategy)
+    print(
+        f"Serving URL shortener on port {arguments.port} "
+        f"with {arguments.strategy} collision handling"
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
